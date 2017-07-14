@@ -1,12 +1,17 @@
 import javax.swing.*;
 import controlP5.*;
+import java.util.*;
 ControlP5 cp5;
+
 //画像のインスタンス
 PImage pimage;
 PImage cat_img;
-PImage buttonImage1,buttonImage2,buttonImage3,buttonImage4;
-//選択ファイルの名前を保持する
-String getFile = null;
+//ファイルのパスを保持する
+String File_paths[];
+//パスのリスト表示用
+String View_File_paths[];
+// 現在表示されている画像のパス
+String Current_img_path = null;
 //切り取った画像の保存名に使う
 String label = "";
 String num = "";
@@ -15,10 +20,13 @@ int old_width=0,old_height=0;
 //切り取る四角の座標
 int start_x,start_y;
 int end_x,end_y;
+int SAVE_NUM = 0;
 //切り取る四角の大きさ
 final int RECT_SIZE = 64;
+//読み込みディレクトリのパス
+final String LOAD_DATA_PATH ="/Users/read_dir";
 //保存先のディレクトリのパス
-final String DATA_PATH = "./";
+final String SAVE_DATA_PATH = "/Users/save_dir" + "/";
 //切り取りのイベント
 boolean isCatting = false;
 boolean step1,step2 = false;
@@ -28,51 +36,42 @@ void setup(){
   noFill();
   background(255,255,255);
   size(820,700);
-  buttonImage1 = loadImage("loadimage.gif");
-  buttonImage2 = loadImage("catout.gif");
-  buttonImage3 = loadImage("reload.gif");
-  buttonImage4 = loadImage("saveimage.gif");
-  image(buttonImage1,700,350);
-  image(buttonImage2,700,390);
-  image(buttonImage3,700,430);
-  image(buttonImage4,700,470);
+  Loadfolder();
   //ラベル入力フォーム
   cp5 = new ControlP5(this);
   cp5.addTextfield("label")
-        .setPosition(700,210)
+        .setPosition(700,500)
         .setSize(100,40)
         .setFont(createFont("arial",13));
   //番号
  cp5.addTextfield("number")
-      .setPosition(700,260)
+      .setPosition(700,560)
       .setSize(100,40)
       .setFont(createFont("arial",13));
+
+//画像フォルダの一覧リスト
+List<String> l = Arrays.asList(View_File_paths);
+
+cp5.addScrollableList("dropdown")
+   .setPosition(690, 50)
+   .setSize(120, 400)
+   .setBarHeight(30)
+   .setItemHeight(30)
+   .setFont(createFont("arial",11))
+   .addItems(l);
 }
 
 void draw(){
-  if(getFile != null){
-    fileLoader(); 
-  } 
-  image(buttonImage1,700,350);
-  image(buttonImage2,700,390);
-  image(buttonImage3,700,430);
-  image(buttonImage4,700,470);
 }
 
-void mouseClicked(){
-  //println(mouseX,mouseY);
-  //ファイル選択のイベント
-  if(mouseX>=700 && mouseX<=800 && mouseY>=350 && mouseY<=380){
-      getFile = getFileName(); 
-  } 
-  //切り抜きのイベントをオンにする
-  else if(mouseX>=700 && mouseX<=800 && mouseY>=390 && mouseY<=420){
+void keyPressed(){
+  if(key == 'Z' || key == 'z'){
+    //切り抜きイベントをオンにする
       isCatting = true;
       step1 = true;
-      println("Catting event : ON");
-  }
-  //四角の消去
-  else if(mouseX>=700 && mouseX<=800 && mouseY>=430 && mouseY<=460){
+      println("Catting event : ON");   
+  }else if(key == 'X' || key == 'x'){
+    //画像のリロードと切り抜きイベントのオフ
       stroke(255);
       fill(255);
       //画像をクリアしてから表示
@@ -88,20 +87,26 @@ void mouseClicked(){
       start_y = 0;
       end_x = 0;
       end_y = 0;
-      println("Catting event : OFF");
-  }
-  //保存
-  else if(mouseX>=700 && mouseX<=800 && mouseY>=470 && mouseY<=500){
-      if(pimage != null && label != null && num != null && isCatting == true){
+      println("Catting event : OFF");    
+  }else if(key == ENTER  || key == 'C' || key == 'c'){
+          if(pimage != null && label != null && num != null && isCatting == true){
           label = cp5.get(Textfield.class,"label").getText();
-          num = cp5.get(Textfield.class,"number").getText();
+          if(SAVE_NUM == 0){
+            //SAVE_NUMを番号入力フォームの値で初期化
+            //以降の保存時の番号は初期化の値を++1した番号になる
+            num = cp5.get(Textfield.class,"number").getText();
+            SAVE_NUM = Integer.parseInt(num);
+          }else{
+            SAVE_NUM++;
+          }
+          num = Integer.toString(SAVE_NUM);
           //切り取った画像
           try{          
               cat_img = pimage.get(start_x,start_y,abs(end_x - start_x), abs(end_y-start_y));
               cat_img.resize(RECT_SIZE,RECT_SIZE);
               //画像の保存場所は各自で設定する
-              cat_img.save(DATA_PATH+label+"-"+num+".jpg");
-              println("Save image");
+              cat_img.save(SAVE_DATA_PATH+label+"-"+num+".jpg");
+              println("Save image" + SAVE_DATA_PATH+label+"-"+num+".jpg");
               start_x = 0;
               start_y = 0;
               end_x = 0;
@@ -112,10 +117,19 @@ void mouseClicked(){
             isCatting = false;
             step1 = false;
             step2 = false;
+            //画像と短形のクリア
+            stroke(255);
+            fill(255);
+            rect(0,0,pimage.width,pimage.height);
+            image(pimage, 0, 0, pimage.width, pimage.height); 
+            stroke(255,0,0);
+            noFill();
             println("Catting event : OFF");
           }
       }
   }
+}
+void mouseClicked(){
   //切り抜きするための範囲を示す四角を描く
   if(pimage != null){
       if(isCatting && (mouseX>= 0 && mouseX<=pimage.width && mouseY>=0 && mouseY<= pimage.height) ){
@@ -139,16 +153,34 @@ void mouseClicked(){
  
 }
 
-void fileLoader(){
-  //選択ファイルパスの拡張子の文字列を取得する
-  String ext = getFile.substring(getFile.lastIndexOf('.') + 1);
-  //その文字列を小文字にする
-  ext.toLowerCase();
-  //文字列末尾がjpg,pngのいずれかであれば 
-  if(ext.equals("jpg") || ext.equals("png") || ext.equals("gif") || ext.equals("jpeg")){
+void Loadfolder(){
+  File f = new File(LOAD_DATA_PATH);
+  File[] getFile = f.listFiles();
+  File_paths = new String[getFile.length];
+  View_File_paths = new String[getFile.length];
+  String s = "";
+  for(int i = 0; i < getFile.length; i++){
+      s = getFile[i].getPath();
+      String ext = s.substring(s.lastIndexOf('.') + 1);
+      ext.toLowerCase();
+      if(ext.equals("jpg") || ext.equals("png") || ext.equals("gif") || ext.equals("jpeg") ||  ext.equals("JPG") ||  ext.equals("PNG")){
+            File_paths[i] = s;
+            View_File_paths[i] = s.substring(s.lastIndexOf('/'));
+      }else{
+          File_paths[i] = "Failed";
+          View_File_paths[i] = "Failed";     
+      }
+  }
+}
+
+void dropdown(int n) {
+  Current_img_path = File_paths[n];
+  
+  println(Current_img_path);
+  if(!Current_img_path.equals("Failed")){
     //選択ファイルパスの画像を取り込む
-    pimage = loadImage(getFile);
-    println("Load : "+ getFile);
+    pimage = loadImage(Current_img_path);
+    println("Load : "+ Current_img_path);
     if(pimage.width > 700 || pimage.height > 700){
       pimage.resize(pimage.width/5,pimage.height/5);
     }
@@ -167,40 +199,5 @@ void fileLoader(){
     old_height = pimage.height;
     stroke(255,0,0);
     noFill();
-    //print(pimage.width);
   }
-  //選択ファイルパスを空に戻す
-  getFile = null; 
-}
-
-//ファイル選択画面、選択ファイルパス取得の処理 
-String getFileName(){
-  //処理タイミングの設定 
-  SwingUtilities.invokeLater(new Runnable() { 
-      public void run() {
-          try {
-               //ファイル選択画面表示 
-              JFileChooser fc = new JFileChooser(); 
-               int returnVal = fc.showOpenDialog(null);
-               //「開く」ボタンが押された場合
-               if (returnVal == JFileChooser.APPROVE_OPTION) {
-                 //選択ファイル取得 
-                 File file = fc.getSelectedFile();
-                 //選択ファイルのパス取得 
-                 getFile = file.getPath(); 
-               }else{
-                 step1 = false;
-                 step2 = false;
-                 isCatting = false;
-               }
-          }
-            //上記以外の場合 
-           catch (Exception e) {
-               //エラー出力 
-               e.printStackTrace(); 
-           } 
-      } 
-  });
-  //選択ファイルパス取得
-  return getFile; 
 }
